@@ -1,7 +1,9 @@
 import streamlit as st
 import matplotlib.pyplot as plt
+
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import Statevector, plot_bloch_multivector, plot_state_qsphere
+from qiskit.quantum_info import Statevector
+from qiskit.visualization import plot_bloch_multivector, plot_state_qsphere
 from qiskit_aer import AerSimulator
 # PAGE CONFIGURATION
 st.set_page_config(page_title="Quantum Circuit Designer & Simulator",page_icon="⚛️",layout="wide")
