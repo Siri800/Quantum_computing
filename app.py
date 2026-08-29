@@ -1,195 +1,529 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 
-from qiskit import QuantumCircuit
+from qiskit import QuantumCircuit, transpile
 from qiskit.quantum_info import Statevector
-from qiskit.visualization import plot_bloch_multivector, plot_state_qsphere
+from qiskit.visualization import plot_bloch_multivector
 from qiskit_aer import AerSimulator
+
+
+# ============================================================
 # PAGE CONFIGURATION
-st.set_page_config(page_title="Quantum Circuit Designer & Simulator",page_icon="⚛️",layout="wide")
+# ============================================================
+
+st.set_page_config(
+    page_title="Quantum Circuit Designer & Simulator",
+    page_icon="⚛️",
+    layout="wide"
+)
+
+
+# ============================================================
 # TITLE
+# ============================================================
+
 st.title("⚛️ Quantum Circuit Designer and Simulator")
-st.markdown("""Design, visualize and simulate fundamental quantum circuits using **Qiskit**.The application supports single-qubit and multi-qubit gates,quantum state visualization, measurement outcomes and probability analysis.""")
-# CIRCUIT BUILDERS
-def create_circuit(circuit_name, theta=3.14159 / 2):
-    if circuit_name == "Identity":
+
+st.markdown("""
+### Interactive Qiskit Application
+
+Design, visualize and simulate fundamental quantum circuits.
+The application supports single-qubit gates, multi-qubit gates,
+measurements, statevector analysis and circuit statistics.
+""")
+
+
+# ============================================================
+# CIRCUIT CREATION FUNCTIONS
+# ============================================================
+
+def create_circuit(name, theta=1.5708):
+
+    if name == "Identity":
         qc = QuantumCircuit(1)
         qc.id(0)
-    elif circuit_name == "Pauli-X":
+
+    elif name == "Pauli-X":
         qc = QuantumCircuit(1)
         qc.x(0)
-    elif circuit_name == "Pauli-Y":
+
+    elif name == "Pauli-Y":
         qc = QuantumCircuit(1)
         qc.y(0)
-    elif circuit_name == "Pauli-Z":
+
+    elif name == "Pauli-Z":
         qc = QuantumCircuit(1)
         qc.z(0)
-    elif circuit_name == "Hadamard":
+
+    elif name == "Hadamard":
         qc = QuantumCircuit(1)
         qc.h(0)
-    elif circuit_name == "Phase-S":
+
+    elif name == "Phase-S":
         qc = QuantumCircuit(1)
         qc.s(0)
-    elif circuit_name == "Phase-T":
+
+    elif name == "Phase-T":
         qc = QuantumCircuit(1)
         qc.t(0)
-    elif circuit_name == "Rx":
+
+    elif name == "Rx":
         qc = QuantumCircuit(1)
         qc.rx(theta, 0)
-    elif circuit_name == "Ry":
+
+    elif name == "Ry":
         qc = QuantumCircuit(1)
         qc.ry(theta, 0)
-    elif circuit_name == "Rz":
+
+    elif name == "Rz":
         qc = QuantumCircuit(1)
         qc.rz(theta, 0)
-    elif circuit_name == "Measurement":
+
+    elif name == "Measurement":
         qc = QuantumCircuit(1, 1)
         qc.h(0)
         qc.measure(0, 0)
-    elif circuit_name == "CNOT":
+
+    elif name == "CNOT":
         qc = QuantumCircuit(2)
         qc.cx(0, 1)
-    elif circuit_name == "CZ":
+
+    elif name == "CZ":
         qc = QuantumCircuit(2)
         qc.cz(0, 1)
-    elif circuit_name == "SWAP":
+
+    elif name == "SWAP":
         qc = QuantumCircuit(2)
         qc.x(0)
         qc.swap(0, 1)
-    elif circuit_name == "Toffoli":
+
+    elif name == "Toffoli":
         qc = QuantumCircuit(3)
         qc.x(0)
         qc.x(1)
         qc.ccx(0, 1, 2)
-    elif circuit_name == "Bell State":
+
+    elif name == "Bell State":
         qc = QuantumCircuit(2)
         qc.h(0)
         qc.cx(0, 1)
-    elif circuit_name == "GHZ State":
+
+    elif name == "GHZ State":
         qc = QuantumCircuit(3)
         qc.h(0)
         qc.cx(0, 1)
         qc.cx(0, 2)
-    else:
-        qc = QuantumCircuit(1)
-    return qc
-# SIMULATION
-def simulate_circuit(qc, shots):
-    statevector_circuit = qc.remove_final_measurements(inplace=False)
-    state = Statevector.from_instruction(statevector_circuit)
-    measured_circuit = qc.copy()
-    if measured_circuit.num_clbits == 0:
-        measured_circuit.measure_all()
-    simulator = AerSimulator()
-    result = simulator.run(measured_circuit,shots=shots,seed_simulator=42).result()
-    counts = result.get_counts()
-    return state, counts
-# SIDEBAR
-st.sidebar.header("Circuit Controls")
-circuit_options = ["Identity","Pauli-X","Pauli-Y","Pauli-Z","Hadamard","Phase-S","Phase-T","Rx","Ry","Rz","Measurement","CNOT","CZ","SWAP","Toffoli","Bell State","GHZ State"]
 
-selected_circuit = st.sidebar.selectbox("Select Quantum Circuit",circuit_options)
-theta = 3.14159 / 2
-if selected_circuit in ["Rx", "Ry", "Rz"]:
-    theta = st.sidebar.slider("Rotation Angle θ",min_value=0.0,max_value=6.28318,value=3.14159 / 2,step=0.1)
-shots = st.sidebar.slider("Number of Shots",min_value=100,max_value=5000,value=1024,step=100)
-# CREATE CIRCUIT
-qc = create_circuit(selected_circuit,theta)
-# DISPLAY CIRCUIT
-st.header("1. Quantum Circuit")
-st.code(qc.draw("text"),language="text")
-# SIMULATION
-state, counts = simulate_circuit(qc,shots)
+    return qc
+
+
+# ============================================================
+# STATEVECTOR SIMULATION
+# ============================================================
+
+def get_statevector(qc):
+
+    # Remove measurements before calculating statevector
+    circuit_for_state = qc.remove_final_measurements(
+        inplace=False
+    )
+
+    return Statevector.from_instruction(
+        circuit_for_state
+    )
+
+
+# ============================================================
+# MEASUREMENT SIMULATION
+# ============================================================
+
+def get_counts(qc, shots):
+
+    measured = qc.copy()
+
+    # Add measurements if the circuit has none
+    if measured.num_clbits == 0:
+        measured.measure_all()
+
+    simulator = AerSimulator()
+
+    compiled = transpile(
+        measured,
+        simulator
+    )
+
+    result = simulator.run(
+        compiled,
+        shots=shots,
+        seed_simulator=42
+    ).result()
+
+    return result.get_counts()
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+st.sidebar.header("⚙️ Circuit Controls")
+
+circuit_names = [
+    "Identity",
+    "Pauli-X",
+    "Pauli-Y",
+    "Pauli-Z",
+    "Hadamard",
+    "Phase-S",
+    "Phase-T",
+    "Rx",
+    "Ry",
+    "Rz",
+    "Measurement",
+    "CNOT",
+    "CZ",
+    "SWAP",
+    "Toffoli",
+    "Bell State",
+    "GHZ State"
+]
+
+selected = st.sidebar.selectbox(
+    "Select Circuit",
+    circuit_names
+)
+
+
+# ============================================================
+# ROTATION ANGLE
+# ============================================================
+
+theta = 3.141592653589793 / 2
+
+if selected in ["Rx", "Ry", "Rz"]:
+
+    theta = st.sidebar.slider(
+        "Rotation Angle θ",
+        min_value=0.0,
+        max_value=6.2832,
+        value=1.5708,
+        step=0.1
+    )
+
+    st.sidebar.write(
+        f"θ = {theta:.2f} radians"
+    )
+
+
+# ============================================================
+# SHOTS
+# ============================================================
+
+shots = st.sidebar.slider(
+    "Number of Shots",
+    min_value=100,
+    max_value=5000,
+    value=1024,
+    step=100
+)
+
+
+# ============================================================
+# CREATE SELECTED CIRCUIT
+# ============================================================
+
+qc = create_circuit(
+    selected,
+    theta
+)
+
+
+# ============================================================
+# CIRCUIT DIAGRAM
+# ============================================================
+
+st.header("1️⃣ Circuit Diagram")
+
+st.code(
+    qc.draw("text"),
+    language="text"
+)
+
+
+# ============================================================
 # STATEVECTOR
-st.header("2. Quantum State")
+# ============================================================
+
+state = get_statevector(qc)
+
+st.header("2️⃣ Quantum State")
+
 st.write("Statevector:")
-st.code(str(state),language="text")
+
+st.code(
+    str(state),
+    language="text"
+)
+
+
+# ============================================================
 # PROBABILITIES
-st.header("3. State Probabilities")
+# ============================================================
+
+st.header("3️⃣ State Probabilities")
+
 probabilities = state.probabilities_dict()
-probability_data = {str(state_label): float(probability)for state_label, probability in probabilities.items()}
-st.json(probability_data)
-# MEASUREMENT RESULTS
-st.header("4. Measurement Results")
-st.write(f"Total shots: {shots}")
+
+probability_table = {
+    str(k): round(float(v), 6)
+    for k, v in probabilities.items()
+}
+
+st.json(probability_table)
+
+
+# ============================================================
+# MEASUREMENTS
+# ============================================================
+
+counts = get_counts(
+    qc,
+    shots
+)
+
+st.header("4️⃣ Measurement Results")
+
+st.write(
+    f"Number of shots: **{shots}**"
+)
+
 st.write(counts)
+
+
+# ============================================================
 # HISTOGRAM
-st.header("5. Measurement Histogram")
+# ============================================================
+
+st.header("5️⃣ Measurement Histogram")
+
 fig, ax = plt.subplots()
-labels = list(counts.keys())
+
+states = list(counts.keys())
 values = list(counts.values())
-ax.bar(labels, values)
+
+ax.bar(
+    states,
+    values
+)
+
 ax.set_xlabel("Measured State")
 ax.set_ylabel("Number of Measurements")
-ax.set_title(f"{selected_circuit} - Measurement Results")
+ax.set_title(
+    f"{selected} - Measurement Results"
+)
+
 st.pyplot(fig)
+
 plt.close(fig)
-# STATE VISUALIZATION
-st.header("6. Quantum State Visualization")
+
+
+# ============================================================
+# QUANTUM STATE VISUALIZATION
+# ============================================================
+
+st.header("6️⃣ Quantum State Visualization")
+
 if state.num_qubits == 1:
-    fig = plot_bloch_multivector(state)
-    st.pyplot(fig)
-    plt.close(fig)
+
+    try:
+
+        fig = plot_bloch_multivector(
+            state
+        )
+
+        st.pyplot(fig)
+
+        plt.close(fig)
+
+    except Exception as error:
+
+        st.warning(
+            f"Bloch sphere visualization unavailable: {error}"
+        )
+
 else:
-    st.write("Q-sphere representation:")
-    fig = plot_state_qsphere(state)
-    st.pyplot(fig)
-    plt.close(fig)
+
+    st.info(
+        "The selected circuit contains multiple qubits. "
+        "The statevector and measurement distribution are "
+        "shown above."
+    )
+
+
+# ============================================================
 # CIRCUIT INFORMATION
-st.header("7. Circuit Information")
+# ============================================================
+
+st.header("7️⃣ Circuit Information")
+
 col1, col2, col3 = st.columns(3)
+
 with col1:
-    st.metric("Number of Qubits",qc.num_qubits)
+
+    st.metric(
+        "Qubits",
+        qc.num_qubits
+    )
+
 with col2:
-    st.metric("Circuit Depth",qc.depth())
+
+    st.metric(
+        "Circuit Depth",
+        qc.depth()
+    )
+
 with col3:
-    st.metric("Number of Gates",sum(qc.count_ops().values()))
+
+    st.metric(
+        "Total Gates",
+        sum(qc.count_ops().values())
+    )
+
+
 st.subheader("Gate Count")
-st.write(qc.count_ops())
-# THEORETICAL INFORMATION
-st.header("8. Theoretical Result")
-theoretical_results = {"Identity":"The qubit remains in |0⟩.",
+
+st.write(
+    qc.count_ops()
+)
+
+
+# ============================================================
+# TRANSPILATION ANALYSIS
+# ============================================================
+
+st.header("8️⃣ Transpilation Analysis")
+
+simulator = AerSimulator()
+
+transpiled = transpile(
+    qc,
+    simulator,
+    optimization_level=3
+)
+
+col1, col2 = st.columns(2)
+
+with col1:
+
+    st.subheader("Original Circuit")
+
+    st.code(
+        qc.draw("text"),
+        language="text"
+    )
+
+    st.write(
+        "Original depth:",
+        qc.depth()
+    )
+
+    st.write(
+        "Original gates:",
+        qc.count_ops()
+    )
+
+
+with col2:
+
+    st.subheader("Transpiled Circuit")
+
+    st.code(
+        transpiled.draw("text"),
+        language="text"
+    )
+
+    st.write(
+        "Transpiled depth:",
+        transpiled.depth()
+    )
+
+    st.write(
+        "Transpiled gates:",
+        transpiled.count_ops()
+    )
+
+
+# ============================================================
+# THEORETICAL RESULT
+# ============================================================
+
+st.header("9️⃣ Theoretical Result")
+
+theory = {
+
+    "Identity":
+        "The qubit remains in |0⟩.",
+
     "Pauli-X":
-        "The state changes from |0⟩ to |1⟩.",
+        "Pauli-X flips |0⟩ to |1⟩.",
+
     "Pauli-Y":
-        "The state changes from |0⟩ to i|1⟩.",
+        "Pauli-Y transforms |0⟩ to i|1⟩.",
+
     "Pauli-Z":
-        "The |0⟩ state remains unchanged while |1⟩ receives a phase flip.",
+        "Pauli-Z applies a phase flip to |1⟩.",
+
     "Hadamard":
-        "Creates an equal superposition: (|0⟩ + |1⟩)/√2.",
+        "Hadamard creates the superposition (|0⟩ + |1⟩)/√2.",
+
     "Phase-S":
-        "Applies a phase shift of π/2 to the |1⟩ component.",
+        "Phase-S applies a π/2 phase shift.",
+
     "Phase-T":
-        "Applies a phase shift of π/4 to the |1⟩ component.",
+        "Phase-T applies a π/4 phase shift.",
 
     "Rx":
-        "Rotates the qubit state around the X-axis.",
+        "Rx rotates the state around the X-axis.",
+
     "Ry":
-        "Rotates the qubit state around the Y-axis.",
+        "Ry rotates the state around the Y-axis.",
+
     "Rz":
-        "Rotates the qubit state around the Z-axis.",
+        "Rz rotates the state around the Z-axis.",
+
     "Measurement":
         "Measurement converts a quantum state into a classical result.",
-    "CNOT":
-        "Flips the target qubit when the control qubit is |1⟩.",
-    "CZ":
-        "Applies a phase flip when both qubits are |1⟩.",
-    "SWAP":
-        "Exchanges the states of two qubits.",
-    "Toffoli":
-        "Flips the target qubit when both control qubits are |1⟩.",
-    "Bell State":
-        "Creates an entangled two-qubit state: (|00⟩ + |11⟩)/√2.",
-    "GHZ State":
-        "Creates a three-qubit entangled state: (|000⟩ + |111⟩)/√2."
-}
-st.info(theoretical_results[selected_circuit])
-# FOOTER
-st.markdown("---")
-st.markdown(
-    """
-    **Quantum Circuit Designer and Simulator**
 
-    Developed using Python, Qiskit, NumPy, Matplotlib and Streamlit.
-    """
+    "CNOT":
+        "CNOT flips the target when the control qubit is |1⟩.",
+
+    "CZ":
+        "CZ applies a phase flip when both qubits are |1⟩.",
+
+    "SWAP":
+        "SWAP exchanges the states of two qubits.",
+
+    "Toffoli":
+        "Toffoli flips the target when both control qubits are |1⟩.",
+
+    "Bell State":
+        "Bell state creates entanglement: (|00⟩ + |11⟩)/√2.",
+
+    "GHZ State":
+        "GHZ state creates three-qubit entanglement: (|000⟩ + |111⟩)/√2."
+}
+
+st.info(
+    theory[selected]
+)
+
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.markdown("---")
+
+st.caption(
+    "Quantum Circuit Designer and Simulator | "
+    "Python + Qiskit + Qiskit Aer + Streamlit"
 )
